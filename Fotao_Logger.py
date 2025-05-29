@@ -15,36 +15,47 @@ import sys
 # Função para receber e traduzir os dados da conexão serial
 def receive_and_parse_data(serial_port, baud_rate):
     """
-    Lê uma linha da porta série, interpreta os dados no formato 'B:2.11 P:2.34',
+    Lê uma linha da porta série no formato 'B-0.07,P0.00'
     e retorna um dicionário com os valores de corrente das baterias e do painel solar.
     """
     try:
         line = serial_port.readline().decode('utf-8').strip()
-        # Exemplo de linha: "B:2.11 P:2.34"
+        # Exemplo de linha: "B-0.07,P0.00"
         if line:
-            # Inicialização dos valores
             battery_current = None
             panel_current = None
 
-            # Divide a linha em partes
-            parts = line.split()
+            # Divide a linha nos dois blocos pelo separador vírgula
+            parts = line.split(',')
             for part in parts:
-                if part.startswith("B:"):
+                # Exemplo de part: "B-0.07" ou "P0.00"
+                if part.startswith("B"):
+                    # Remove o 'B' e, se existir, o '-'
+                    value = part[1:]
+                    if value.startswith('-'):
+                        value = value[1:]
+                        sign = -1
+                    else:
+                        sign = 1
                     try:
-                        battery_current = float(part[2:])
+                        battery_current = sign * float(value)
                     except ValueError:
                         battery_current = None
-                elif part.startswith("P:"):
+                elif part.startswith("P"):
+                    value = part[1:]
+                    if value.startswith('-'):
+                        value = value[1:]
+                        sign = -1
+                    else:
+                        sign = 1
                     try:
-                        panel_current = float(part[2:])
+                        panel_current = sign * float(value)
                     except ValueError:
                         panel_current = None
 
-            # Retorna apenas se ambos os valores estiverem presentes
             if battery_current is not None and panel_current is not None:
-                # Adiciona timestamp para referência temporal
                 return {
-                    "timestamp": datetime.now(),
+                    "timestamp": None,  # Vai ser preenchido na main com tempo relativo
                     "battery_current": battery_current,
                     "panel_current": panel_current
                 }
@@ -54,10 +65,6 @@ def receive_and_parse_data(serial_port, baud_rate):
 
 # Função para analisar os dados recebidos
 def analyze_data(parsed_data):
-    """
-    Recebe um dicionário com as correntes da bateria e do painel,
-    calcula a diferença entre estes dois valores, e retorna os dados prontos para visualização.
-    """
     if parsed_data is None:
         return None
 
@@ -80,11 +87,7 @@ def analyze_data(parsed_data):
 
 # Função para guardar os dados num ficheiro CSV ou Excel
 def save_data_to_file(data, filename=None):
-
-    """
-    Guarda os dados analisados (dicionário) num ficheiro CSV.
-    Se o ficheiro não existir, cria o cabeçalho.
-    """
+    
     # Gera nome único na primeira chamada e guarda como atributo da função
     if not hasattr(save_data_to_file, "unique_filename"):
         def generate_unique_filename(base="data_log", ext="csv"):
